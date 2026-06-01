@@ -2,6 +2,8 @@
 
 REST endpoints for external module integration live here.
 
+See `docs/API_EXAMPLES.md` for request examples and an end-to-end integration flow.
+
 Planned groups:
 
 - Events API: operational events from Gantt, operators, SCADA, or future integrations.
