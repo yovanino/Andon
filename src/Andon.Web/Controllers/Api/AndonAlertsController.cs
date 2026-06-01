@@ -80,4 +80,55 @@ public sealed class AndonAlertsController(IAndonAlertService andonAlertService) 
             "Andon alert transitioned.",
             correlationId));
     }
+
+    [HttpGet("{id:long}/comments")]
+    public async Task<IActionResult> Comments(
+        long id,
+        [FromQuery] ListAndonCommentsRequest request,
+        CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.TraceIdentifier;
+        var (comments, errors) = await andonAlertService.GetCommentsAsync(id, request, cancellationToken);
+
+        if (errors.Count > 0)
+        {
+            return BadRequest(ApiResult<IReadOnlyList<AndonCommentResponse>>.Fail(
+                errors,
+                "Andon alert comments were not retrieved.",
+                correlationId));
+        }
+
+        var response = comments
+            .Select(AndonCommentResponse.FromEntity)
+            .ToList();
+
+        return Ok(ApiResult<IReadOnlyList<AndonCommentResponse>>.Ok(
+            response,
+            "Andon alert comments retrieved.",
+            correlationId));
+    }
+
+    [HttpPost("{id:long}/comments")]
+    public async Task<IActionResult> AddComment(
+        long id,
+        [FromBody] AddAndonCommentRequest request,
+        CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.TraceIdentifier;
+        var (comment, errors) = await andonAlertService.AddCommentAsync(id, request, cancellationToken);
+
+        if (errors.Count > 0 || comment is null)
+        {
+            return BadRequest(ApiResult<AndonCommentResponse>.Fail(
+                errors,
+                "Andon alert comment was not created.",
+                correlationId));
+        }
+
+        var response = AndonCommentResponse.FromEntity(comment);
+
+        return Created(
+            $"/api/v1/andon/alerts/{id}/comments/{response.Id}",
+            ApiResult<AndonCommentResponse>.Ok(response, "Andon alert comment created.", correlationId));
+    }
 }

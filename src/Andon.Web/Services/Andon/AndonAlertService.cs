@@ -196,6 +196,84 @@ public sealed class AndonAlertService(AppDbContext context) : IAndonAlertService
         return (alert, []);
     }
 
+    public async Task<(AndonComment? Comment, IReadOnlyList<ApiError> Errors)> AddCommentAsync(
+        long alertId,
+        AddAndonCommentRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var errors = Validate(alertId, request);
+        if (errors.Count > 0)
+        {
+            return (null, errors);
+        }
+
+        var alert = await context.AndonAlerts
+            .FirstOrDefaultAsync(item =>
+                item.Id == alertId &&
+                item.TenantId == Normalize(request.TenantId),
+                cancellationToken);
+
+        if (alert is null)
+        {
+            return (null, [ApiError.Create("Andon alert was not found for this tenant.", "alert_not_found", "alertId")]);
+        }
+
+        var now = DateTime.UtcNow;
+        var comment = new AndonComment
+        {
+            TenantId = Normalize(request.TenantId),
+            AndonAlertId = alert.Id,
+            Comment = Normalize(request.Comment),
+            CreatedByPrincipalType = Normalize(request.CreatedByPrincipalType, fallback: "system"),
+            CreatedByPrincipalId = Normalize(request.CreatedByPrincipalId),
+            CreatedByDisplayName = Normalize(request.CreatedByDisplayName),
+            CreatedUtc = now
+        };
+
+        alert.UpdatedUtc = now;
+        context.AndonComments.Add(comment);
+        await context.SaveChangesAsync(cancellationToken);
+
+        return (comment, []);
+    }
+
+    public async Task<(IReadOnlyList<AndonComment> Comments, IReadOnlyList<ApiError> Errors)> GetCommentsAsync(
+        long alertId,
+        ListAndonCommentsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var errors = Validate(alertId, request);
+        if (errors.Count > 0)
+        {
+            return ([], errors);
+        }
+
+        var alertExists = await context.AndonAlerts
+            .AsNoTracking()
+            .AnyAsync(item =>
+                item.Id == alertId &&
+                item.TenantId == Normalize(request.TenantId),
+                cancellationToken);
+
+        if (!alertExists)
+        {
+            return ([], [ApiError.Create("Andon alert was not found for this tenant.", "alert_not_found", "alertId")]);
+        }
+
+        var limit = request.Limit ?? 100;
+        var comments = await context.AndonComments
+            .AsNoTracking()
+            .Where(item =>
+                item.AndonAlertId == alertId &&
+                item.TenantId == Normalize(request.TenantId))
+            .OrderBy(item => item.CreatedUtc)
+            .ThenBy(item => item.Id)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+
+        return (comments, []);
+    }
+
     private static List<ApiError> Validate(CreateAndonAlertRequest request)
     {
         var errors = new List<ApiError>();
@@ -225,6 +303,48 @@ public sealed class AndonAlertService(AppDbContext context) : IAndonAlertService
         AddMaxLength(errors, request.ResponsibleDisplayName, 160, "responsibleDisplayName");
         AddMaxLength(errors, request.CreatedByPrincipalType, 24, "createdByPrincipalType");
         AddMaxLength(errors, request.CreatedByPrincipalId, 80, "createdByPrincipalId");
+
+        return errors;
+    }
+
+    private static List<ApiError> Validate(long alertId, AddAndonCommentRequest request)
+    {
+        var errors = new List<ApiError>();
+
+        if (alertId <= 0)
+        {
+            errors.Add(ApiError.Create("AlertId must be greater than zero.", "invalid_alert_id", "alertId"));
+        }
+
+        AddRequired(errors, request.TenantId, "tenantId", "TenantId is required.");
+        AddRequired(errors, request.Comment, "comment", "Comment is required.");
+
+        AddMaxLength(errors, request.TenantId, 64, "tenantId");
+        AddMaxLength(errors, request.Comment, 2000, "comment");
+        AddMaxLength(errors, request.CreatedByPrincipalType, 24, "createdByPrincipalType");
+        AddMaxLength(errors, request.CreatedByPrincipalId, 80, "createdByPrincipalId");
+        AddMaxLength(errors, request.CreatedByDisplayName, 160, "createdByDisplayName");
+
+        return errors;
+    }
+
+    private static List<ApiError> Validate(long alertId, ListAndonCommentsRequest request)
+    {
+        var errors = new List<ApiError>();
+
+        if (alertId <= 0)
+        {
+            errors.Add(ApiError.Create("AlertId must be greater than zero.", "invalid_alert_id", "alertId"));
+        }
+
+        AddRequired(errors, request.TenantId, "tenantId", "TenantId is required.");
+
+        if (request.Limit is < 1 or > 500)
+        {
+            errors.Add(ApiError.Create("Limit must be between 1 and 500.", "invalid_limit", "limit"));
+        }
+
+        AddMaxLength(errors, request.TenantId, 64, "tenantId");
 
         return errors;
     }

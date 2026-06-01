@@ -18,4 +18,14 @@ public interface IAndonAlertService
         long id,
         TransitionAndonAlertRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<(AndonComment? Comment, IReadOnlyList<ApiError> Errors)> AddCommentAsync(
+        long alertId,
+        AddAndonCommentRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<(IReadOnlyList<AndonComment> Comments, IReadOnlyList<ApiError> Errors)> GetCommentsAsync(
+        long alertId,
+        ListAndonCommentsRequest request,
+        CancellationToken cancellationToken = default);
 }
