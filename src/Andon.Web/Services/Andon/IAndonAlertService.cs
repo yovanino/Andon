@@ -9,4 +9,8 @@ public interface IAndonAlertService
     Task<(AndonAlert? Alert, IReadOnlyList<ApiError> Errors)> CreateAsync(
         CreateAndonAlertRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<(IReadOnlyList<AndonAlert> Alerts, IReadOnlyList<ApiError> Errors)> GetLiveAsync(
+        LiveAndonAlertsRequest request,
+        CancellationToken cancellationToken = default);
 }

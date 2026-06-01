@@ -41,6 +41,14 @@ public sealed record AndonAlertResponse
 
     public DateTime OpenedUtc { get; init; }
 
+    public DateTime? AcknowledgedUtc { get; init; }
+
+    public DateTime? AssignedUtc { get; init; }
+
+    public DateTime? EscalatedUtc { get; init; }
+
+    public DateTime? ResolvedUtc { get; init; }
+
     public DateTime CreatedUtc { get; init; }
 
     public DateTime UpdatedUtc { get; init; }
@@ -67,6 +75,10 @@ public sealed record AndonAlertResponse
             ResponsiblePrincipalId = item.ResponsiblePrincipalId,
             ResponsibleDisplayName = item.ResponsibleDisplayName,
             OpenedUtc = item.OpenedUtc,
+            AcknowledgedUtc = item.AcknowledgedUtc,
+            AssignedUtc = item.AssignedUtc,
+            EscalatedUtc = item.EscalatedUtc,
+            ResolvedUtc = item.ResolvedUtc,
             CreatedUtc = item.CreatedUtc,
             UpdatedUtc = item.UpdatedUtc
         };

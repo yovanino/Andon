@@ -10,6 +10,14 @@ namespace Andon.Web.Services.Andon;
 
 public sealed class AndonAlertService(AppDbContext context) : IAndonAlertService
 {
+    private static readonly AndonAlertStatus[] OpenStatuses =
+    [
+        AndonAlertStatus.New,
+        AndonAlertStatus.Acknowledged,
+        AndonAlertStatus.InProgress,
+        AndonAlertStatus.Escalated
+    ];
+
     public async Task<(AndonAlert? Alert, IReadOnlyList<ApiError> Errors)> CreateAsync(
         CreateAndonAlertRequest request,
         CancellationToken cancellationToken = default)
@@ -76,6 +84,78 @@ public sealed class AndonAlertService(AppDbContext context) : IAndonAlertService
         return (alert, []);
     }
 
+    public async Task<(IReadOnlyList<AndonAlert> Alerts, IReadOnlyList<ApiError> Errors)> GetLiveAsync(
+        LiveAndonAlertsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var errors = Validate(request);
+        if (errors.Count > 0)
+        {
+            return ([], errors);
+        }
+
+        var limit = request.Limit ?? 100;
+        var openedFromUtc = NormalizeUtc(request.OpenedFromUtc);
+        var openedToUtc = NormalizeUtc(request.OpenedToUtc);
+
+        var query = context.AndonAlerts
+            .AsNoTracking()
+            .Where(item => item.TenantId == Normalize(request.TenantId));
+
+        query = request.Status.HasValue
+            ? query.Where(item => item.Status == request.Status.Value)
+            : query.Where(item => OpenStatuses.Contains(item.Status));
+
+        if (request.Severity.HasValue)
+        {
+            query = query.Where(item => item.Severity == request.Severity.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.MachineId))
+        {
+            query = query.Where(item => item.MachineId == Normalize(request.MachineId));
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.LineCode))
+        {
+            query = query.Where(item => item.LineCode == Normalize(request.LineCode));
+        }
+
+        if (request.ExternalTaskId.HasValue)
+        {
+            query = query.Where(item => item.ExternalTaskId == request.ExternalTaskId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.ResponsiblePrincipalType))
+        {
+            query = query.Where(item => item.ResponsiblePrincipalType == Normalize(request.ResponsiblePrincipalType));
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.ResponsiblePrincipalId))
+        {
+            query = query.Where(item => item.ResponsiblePrincipalId == Normalize(request.ResponsiblePrincipalId));
+        }
+
+        if (openedFromUtc.HasValue)
+        {
+            query = query.Where(item => item.OpenedUtc >= openedFromUtc.Value);
+        }
+
+        if (openedToUtc.HasValue)
+        {
+            query = query.Where(item => item.OpenedUtc <= openedToUtc.Value);
+        }
+
+        var alerts = await query
+            .OrderByDescending(item => item.Severity)
+            .ThenBy(item => item.OpenedUtc)
+            .ThenBy(item => item.Id)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+
+        return (alerts, []);
+    }
+
     private static List<ApiError> Validate(CreateAndonAlertRequest request)
     {
         var errors = new List<ApiError>();
@@ -109,6 +189,43 @@ public sealed class AndonAlertService(AppDbContext context) : IAndonAlertService
         return errors;
     }
 
+    private static List<ApiError> Validate(LiveAndonAlertsRequest request)
+    {
+        var errors = new List<ApiError>();
+
+        AddRequired(errors, request.TenantId, "tenantId", "TenantId is required.");
+
+        if (request.Status.HasValue && !Enum.IsDefined(request.Status.Value))
+        {
+            errors.Add(ApiError.Create("Status is not valid.", "invalid_status", "status"));
+        }
+
+        if (request.Severity.HasValue && !Enum.IsDefined(request.Severity.Value))
+        {
+            errors.Add(ApiError.Create("Severity is not valid.", "invalid_severity", "severity"));
+        }
+
+        var openedFromUtc = NormalizeUtc(request.OpenedFromUtc);
+        var openedToUtc = NormalizeUtc(request.OpenedToUtc);
+        if (openedFromUtc.HasValue && openedToUtc.HasValue && openedFromUtc.Value > openedToUtc.Value)
+        {
+            errors.Add(ApiError.Create("OpenedFromUtc must be earlier than OpenedToUtc.", "invalid_date_range", "openedFromUtc"));
+        }
+
+        if (request.Limit is < 1 or > 500)
+        {
+            errors.Add(ApiError.Create("Limit must be between 1 and 500.", "invalid_limit", "limit"));
+        }
+
+        AddMaxLength(errors, request.TenantId, 64, "tenantId");
+        AddMaxLength(errors, request.MachineId, 80, "machineId");
+        AddMaxLength(errors, request.LineCode, 80, "lineCode");
+        AddMaxLength(errors, request.ResponsiblePrincipalType, 24, "responsiblePrincipalType");
+        AddMaxLength(errors, request.ResponsiblePrincipalId, 80, "responsiblePrincipalId");
+
+        return errors;
+    }
+
     private static void AddRequired(List<ApiError> errors, string value, string field, string message)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -127,6 +244,21 @@ public sealed class AndonAlertService(AppDbContext context) : IAndonAlertService
 
     private static string Normalize(string? value, string fallback = "")
         => string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+
+    private static DateTime? NormalizeUtc(DateTime? value)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        return value.Value.Kind switch
+        {
+            DateTimeKind.Utc => value.Value,
+            DateTimeKind.Local => value.Value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)
+        };
+    }
 
     private static string SerializeJson(JsonElement? value, string? fallback = null)
     {

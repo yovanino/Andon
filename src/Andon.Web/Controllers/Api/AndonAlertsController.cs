@@ -9,6 +9,32 @@ namespace Andon.Web.Controllers.Api;
 [Route("api/v1/andon/alerts")]
 public sealed class AndonAlertsController(IAndonAlertService andonAlertService) : ControllerBase
 {
+    [HttpGet("live")]
+    public async Task<IActionResult> Live(
+        [FromQuery] LiveAndonAlertsRequest request,
+        CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.TraceIdentifier;
+        var (alerts, errors) = await andonAlertService.GetLiveAsync(request, cancellationToken);
+
+        if (errors.Count > 0)
+        {
+            return BadRequest(ApiResult<IReadOnlyList<AndonAlertResponse>>.Fail(
+                errors,
+                "Live Andon alerts were not retrieved.",
+                correlationId));
+        }
+
+        var response = alerts
+            .Select(AndonAlertResponse.FromEntity)
+            .ToList();
+
+        return Ok(ApiResult<IReadOnlyList<AndonAlertResponse>>.Ok(
+            response,
+            "Live Andon alerts retrieved.",
+            correlationId));
+    }
+
     [HttpPost]
     public async Task<IActionResult> Create(
         [FromBody] CreateAndonAlertRequest request,
