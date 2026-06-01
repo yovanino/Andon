@@ -7,6 +7,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 {
     public DbSet<OperationalEvent> OperationalEvents => Set<OperationalEvent>();
 
+    public DbSet<AndonAlert> AndonAlerts => Set<AndonAlert>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -41,6 +43,47 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasIndex(item => new { item.TenantId, item.ExternalTaskId });
             entity.HasIndex(item => new { item.TenantId, item.Severity, item.OccurredUtc });
             entity.HasIndex(item => new { item.TenantId, item.Source, item.EventType });
+        });
+
+        modelBuilder.Entity<AndonAlert>(entity =>
+        {
+            entity.ToTable("andon_alerts");
+
+            entity.HasKey(item => item.Id);
+            entity.Property(item => item.TenantId).HasMaxLength(64).IsRequired();
+            entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
+            entity.Property(item => item.Severity).HasConversion<string>().HasMaxLength(24).IsRequired();
+            entity.Property(item => item.Title).HasMaxLength(200).IsRequired();
+            entity.Property(item => item.Description).HasMaxLength(2000);
+            entity.Property(item => item.MachineId).HasMaxLength(80);
+            entity.Property(item => item.MachineName).HasMaxLength(80);
+            entity.Property(item => item.LineCode).HasMaxLength(80);
+            entity.Property(item => item.WorkOrderId).HasMaxLength(80);
+            entity.Property(item => item.SourceSystem).HasMaxLength(40);
+            entity.Property(item => item.ResponsiblePrincipalType).HasMaxLength(24);
+            entity.Property(item => item.ResponsiblePrincipalId).HasMaxLength(80);
+            entity.Property(item => item.ResponsibleDisplayName).HasMaxLength(160);
+            entity.Property(item => item.OpenedUtc).HasColumnType("datetime(6)");
+            entity.Property(item => item.AcknowledgedUtc).HasColumnType("datetime(6)");
+            entity.Property(item => item.AssignedUtc).HasColumnType("datetime(6)");
+            entity.Property(item => item.EscalatedUtc).HasColumnType("datetime(6)");
+            entity.Property(item => item.ResolvedUtc).HasColumnType("datetime(6)");
+            entity.Property(item => item.ResolutionComment).HasMaxLength(2000);
+            entity.Property(item => item.CreatedByPrincipalType).HasMaxLength(24).IsRequired();
+            entity.Property(item => item.CreatedByPrincipalId).HasMaxLength(80);
+            entity.Property(item => item.CreatedUtc).HasColumnType("datetime(6)");
+            entity.Property(item => item.UpdatedUtc).HasColumnType("datetime(6)");
+
+            entity.HasOne(item => item.OperationalEvent)
+                .WithMany(item => item.AndonAlerts)
+                .HasForeignKey(item => item.OperationalEventId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(item => new { item.TenantId, item.Status, item.OpenedUtc });
+            entity.HasIndex(item => new { item.TenantId, item.Severity, item.Status });
+            entity.HasIndex(item => new { item.TenantId, item.ExternalTaskId, item.Status });
+            entity.HasIndex(item => new { item.TenantId, item.MachineId, item.Status });
+            entity.HasIndex(item => item.OperationalEventId);
         });
     }
 }

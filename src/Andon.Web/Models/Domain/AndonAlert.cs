@@ -3,26 +3,24 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Andon.Web.Models.Domain;
 
-public class OperationalEvent
+public class AndonAlert
 {
     public long Id { get; set; }
 
     [MaxLength(64)]
     public string TenantId { get; set; } = string.Empty;
 
-    public EventSourceType Source { get; set; }
+    public long? OperationalEventId { get; set; }
 
-    public OperationalEventType EventType { get; set; }
+    public AndonAlertStatus Status { get; set; } = AndonAlertStatus.New;
 
-    public OperationalSeverity Severity { get; set; }
+    public OperationalSeverity Severity { get; set; } = OperationalSeverity.Medium;
 
     [MaxLength(200)]
     public string Title { get; set; } = string.Empty;
 
     [MaxLength(2000)]
     public string Description { get; set; } = string.Empty;
-
-    public DateTime OccurredUtc { get; set; } = DateTime.UtcNow;
 
     [MaxLength(80)]
     public string MachineId { get; set; } = string.Empty;
@@ -40,17 +38,30 @@ public class OperationalEvent
 
     public Guid? ExternalTaskId { get; set; }
 
-    [MaxLength(80)]
-    public string ExternalEventId { get; set; } = string.Empty;
-
     [MaxLength(40)]
     public string SourceSystem { get; set; } = string.Empty;
 
-    public string PayloadJson { get; set; } = "{}";
+    [MaxLength(24)]
+    public string ResponsiblePrincipalType { get; set; } = string.Empty;
 
-    public string TaskSnapshotJson { get; set; } = "{}";
+    [MaxLength(80)]
+    public string ResponsiblePrincipalId { get; set; } = string.Empty;
 
-    public string ContextSnapshotJson { get; set; } = "{}";
+    [MaxLength(160)]
+    public string ResponsibleDisplayName { get; set; } = string.Empty;
+
+    public DateTime OpenedUtc { get; set; } = DateTime.UtcNow;
+
+    public DateTime? AcknowledgedUtc { get; set; }
+
+    public DateTime? AssignedUtc { get; set; }
+
+    public DateTime? EscalatedUtc { get; set; }
+
+    public DateTime? ResolvedUtc { get; set; }
+
+    [MaxLength(2000)]
+    public string ResolutionComment { get; set; } = string.Empty;
 
     [MaxLength(24)]
     public string CreatedByPrincipalType { get; set; } = "system";
@@ -60,5 +71,7 @@ public class OperationalEvent
 
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
 
-    public ICollection<AndonAlert> AndonAlerts { get; set; } = [];
+    public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
+
+    public OperationalEvent? OperationalEvent { get; set; }
 }
