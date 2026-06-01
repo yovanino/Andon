@@ -2,6 +2,7 @@ using Andon.Web.Data;
 using Andon.Web.Services.ActionItems;
 using Andon.Web.Services.Andon;
 using Andon.Web.Services.Events;
+using Andon.Web.Services.Gantt;
 using Andon.Web.Services.Rca;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -13,6 +14,7 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddScoped<IActionItemService, ActionItemService>();
 builder.Services.AddScoped<IAndonAlertService, AndonAlertService>();
 builder.Services.AddScoped<IOperationalEventService, OperationalEventService>();
+builder.Services.AddScoped<IGanttIntegrationService, GanttIntegrationService>();
 builder.Services.AddScoped<IRcaIntegrationService, RcaIntegrationService>();
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
