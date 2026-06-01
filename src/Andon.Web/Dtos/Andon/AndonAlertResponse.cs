@@ -49,6 +49,8 @@ public sealed record AndonAlertResponse
 
     public DateTime? ResolvedUtc { get; init; }
 
+    public string ResolutionComment { get; init; } = string.Empty;
+
     public DateTime CreatedUtc { get; init; }
 
     public DateTime UpdatedUtc { get; init; }
@@ -79,6 +81,7 @@ public sealed record AndonAlertResponse
             AssignedUtc = item.AssignedUtc,
             EscalatedUtc = item.EscalatedUtc,
             ResolvedUtc = item.ResolvedUtc,
+            ResolutionComment = item.ResolutionComment,
             CreatedUtc = item.CreatedUtc,
             UpdatedUtc = item.UpdatedUtc
         };

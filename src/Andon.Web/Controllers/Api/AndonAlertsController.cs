@@ -57,4 +57,27 @@ public sealed class AndonAlertsController(IAndonAlertService andonAlertService) 
             $"/api/v1/andon/alerts/{response.Id}",
             ApiResult<AndonAlertResponse>.Ok(response, "Andon alert created.", correlationId));
     }
+
+    [HttpPost("{id:long}/transition")]
+    public async Task<IActionResult> Transition(
+        long id,
+        [FromBody] TransitionAndonAlertRequest request,
+        CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.TraceIdentifier;
+        var (alert, errors) = await andonAlertService.TransitionAsync(id, request, cancellationToken);
+
+        if (errors.Count > 0 || alert is null)
+        {
+            return BadRequest(ApiResult<AndonAlertResponse>.Fail(
+                errors,
+                "Andon alert was not transitioned.",
+                correlationId));
+        }
+
+        return Ok(ApiResult<AndonAlertResponse>.Ok(
+            AndonAlertResponse.FromEntity(alert),
+            "Andon alert transitioned.",
+            correlationId));
+    }
 }

@@ -156,6 +156,46 @@ public sealed class AndonAlertService(AppDbContext context) : IAndonAlertService
         return (alerts, []);
     }
 
+    public async Task<(AndonAlert? Alert, IReadOnlyList<ApiError> Errors)> TransitionAsync(
+        long id,
+        TransitionAndonAlertRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var errors = Validate(id, request);
+        if (errors.Count > 0)
+        {
+            return (null, errors);
+        }
+
+        var alert = await context.AndonAlerts
+            .FirstOrDefaultAsync(item =>
+                item.Id == id &&
+                item.TenantId == Normalize(request.TenantId),
+                cancellationToken);
+
+        if (alert is null)
+        {
+            return (null, [ApiError.Create("Andon alert was not found for this tenant.", "alert_not_found", "id")]);
+        }
+
+        if (alert.Status is AndonAlertStatus.Resolved or AndonAlertStatus.Cancelled)
+        {
+            return (null, [ApiError.Create("Closed Andon alerts cannot be transitioned.", "alert_closed", "status")]);
+        }
+
+        var now = DateTime.UtcNow;
+        var transitionErrors = ApplyTransition(alert, request, now);
+        if (transitionErrors.Count > 0)
+        {
+            return (null, transitionErrors);
+        }
+
+        alert.UpdatedUtc = now;
+        await context.SaveChangesAsync(cancellationToken);
+
+        return (alert, []);
+    }
+
     private static List<ApiError> Validate(CreateAndonAlertRequest request)
     {
         var errors = new List<ApiError>();
@@ -224,6 +264,126 @@ public sealed class AndonAlertService(AppDbContext context) : IAndonAlertService
         AddMaxLength(errors, request.ResponsiblePrincipalId, 80, "responsiblePrincipalId");
 
         return errors;
+    }
+
+    private static List<ApiError> Validate(long id, TransitionAndonAlertRequest request)
+    {
+        var errors = new List<ApiError>();
+
+        if (id <= 0)
+        {
+            errors.Add(ApiError.Create("Id must be greater than zero.", "invalid_id", "id"));
+        }
+
+        AddRequired(errors, request.TenantId, "tenantId", "TenantId is required.");
+
+        if (!Enum.IsDefined(request.Action))
+        {
+            errors.Add(ApiError.Create("Action is not valid.", "invalid_action", "action"));
+        }
+
+        AddMaxLength(errors, request.TenantId, 64, "tenantId");
+        AddMaxLength(errors, request.ResponsiblePrincipalType, 24, "responsiblePrincipalType");
+        AddMaxLength(errors, request.ResponsiblePrincipalId, 80, "responsiblePrincipalId");
+        AddMaxLength(errors, request.ResponsibleDisplayName, 160, "responsibleDisplayName");
+        AddMaxLength(errors, request.Comment, 2000, "comment");
+        AddMaxLength(errors, request.ActorPrincipalType, 24, "actorPrincipalType");
+        AddMaxLength(errors, request.ActorPrincipalId, 80, "actorPrincipalId");
+
+        return errors;
+    }
+
+    private static List<ApiError> ApplyTransition(
+        AndonAlert alert,
+        TransitionAndonAlertRequest request,
+        DateTime now)
+    {
+        return request.Action switch
+        {
+            AndonTransitionAction.Acknowledge => Acknowledge(alert, now),
+            AndonTransitionAction.Assign => Assign(alert, request, now),
+            AndonTransitionAction.Escalate => Escalate(alert, request, now),
+            AndonTransitionAction.Resolve => Resolve(alert, request, now),
+            AndonTransitionAction.Cancel => Cancel(alert, request, now),
+            _ => [ApiError.Create("Action is not supported for alert transition.", "unsupported_action", "action")]
+        };
+    }
+
+    private static List<ApiError> Acknowledge(AndonAlert alert, DateTime now)
+    {
+        alert.Status = alert.Status is AndonAlertStatus.New
+            ? AndonAlertStatus.Acknowledged
+            : alert.Status;
+        alert.AcknowledgedUtc ??= now;
+
+        return [];
+    }
+
+    private static List<ApiError> Assign(
+        AndonAlert alert,
+        TransitionAndonAlertRequest request,
+        DateTime now)
+    {
+        AddResponsible(alert, request);
+        alert.Status = AndonAlertStatus.InProgress;
+        alert.AcknowledgedUtc ??= now;
+        alert.AssignedUtc ??= now;
+
+        return [];
+    }
+
+    private static List<ApiError> Escalate(
+        AndonAlert alert,
+        TransitionAndonAlertRequest request,
+        DateTime now)
+    {
+        AddResponsible(alert, request);
+        alert.Status = AndonAlertStatus.Escalated;
+        alert.AcknowledgedUtc ??= now;
+        alert.EscalatedUtc ??= now;
+
+        return [];
+    }
+
+    private static List<ApiError> Resolve(
+        AndonAlert alert,
+        TransitionAndonAlertRequest request,
+        DateTime now)
+    {
+        if (string.IsNullOrWhiteSpace(request.Comment))
+        {
+            return [ApiError.Create("Comment is required to resolve an Andon alert.", "required", "comment")];
+        }
+
+        alert.Status = AndonAlertStatus.Resolved;
+        alert.ResolvedUtc = now;
+        alert.ResolutionComment = Normalize(request.Comment);
+
+        return [];
+    }
+
+    private static List<ApiError> Cancel(
+        AndonAlert alert,
+        TransitionAndonAlertRequest request,
+        DateTime now)
+    {
+        if (string.IsNullOrWhiteSpace(request.Comment))
+        {
+            return [ApiError.Create("Comment is required to cancel an Andon alert.", "required", "comment")];
+        }
+
+        alert.Status = AndonAlertStatus.Cancelled;
+        alert.ResolvedUtc = now;
+        alert.ResolutionComment = Normalize(request.Comment);
+
+        return [];
+    }
+
+    private static void AddResponsible(AndonAlert alert, TransitionAndonAlertRequest request)
+    {
+        alert.ResponsiblePrincipalType = Normalize(request.ResponsiblePrincipalType, alert.ResponsiblePrincipalType);
+        alert.ResponsiblePrincipalId = Normalize(request.ResponsiblePrincipalId, alert.ResponsiblePrincipalId);
+        alert.ResponsibleDisplayName = Normalize(request.ResponsibleDisplayName, alert.ResponsibleDisplayName);
     }
 
     private static void AddRequired(List<ApiError> errors, string value, string field, string message)

@@ -13,4 +13,9 @@ public interface IAndonAlertService
     Task<(IReadOnlyList<AndonAlert> Alerts, IReadOnlyList<ApiError> Errors)> GetLiveAsync(
         LiveAndonAlertsRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<(AndonAlert? Alert, IReadOnlyList<ApiError> Errors)> TransitionAsync(
+        long id,
+        TransitionAndonAlertRequest request,
+        CancellationToken cancellationToken = default);
 }
