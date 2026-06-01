@@ -41,6 +41,10 @@ public class AndonAlert
     [MaxLength(40)]
     public string SourceSystem { get; set; } = string.Empty;
 
+    public string TaskSnapshotJson { get; set; } = "{}";
+
+    public string ContextSnapshotJson { get; set; } = "{}";
+
     [MaxLength(24)]
     public string ResponsiblePrincipalType { get; set; } = string.Empty;
 

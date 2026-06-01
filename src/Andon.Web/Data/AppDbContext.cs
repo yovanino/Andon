@@ -64,6 +64,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(item => item.LineCode).HasMaxLength(80);
             entity.Property(item => item.WorkOrderId).HasMaxLength(80);
             entity.Property(item => item.SourceSystem).HasMaxLength(40);
+            entity.Property(item => item.TaskSnapshotJson).HasColumnType("longtext").IsRequired();
+            entity.Property(item => item.ContextSnapshotJson).HasColumnType("longtext").IsRequired();
             entity.Property(item => item.ResponsiblePrincipalType).HasMaxLength(24);
             entity.Property(item => item.ResponsiblePrincipalId).HasMaxLength(80);
             entity.Property(item => item.ResponsibleDisplayName).HasMaxLength(160);
@@ -117,6 +119,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasKey(item => item.Id);
             entity.Property(item => item.TenantId).HasMaxLength(64).IsRequired();
             entity.Property(item => item.ExternalRcaIncidentId).HasMaxLength(80);
+            entity.Property(item => item.SourceSystem).HasMaxLength(40);
+            entity.Property(item => item.TaskSnapshotJson).HasColumnType("longtext").IsRequired();
+            entity.Property(item => item.ContextSnapshotJson).HasColumnType("longtext").IsRequired();
             entity.Property(item => item.Title).HasMaxLength(200).IsRequired();
             entity.Property(item => item.Description).HasMaxLength(2000);
             entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
