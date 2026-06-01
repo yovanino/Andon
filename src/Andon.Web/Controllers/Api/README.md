@@ -21,6 +21,7 @@ Implemented endpoints:
 - `GET /api/v1/action-items`
 - `POST /api/v1/action-items`
 - `POST /api/v1/action-items/{id}/status`
+- `GET /api/v1/gantt/tasks/{externalTaskId}/status`
 - `POST /api/v1/gantt/task-events`
 - `POST /api/v1/rca/incidents/from-alert`
 - `POST /api/v1/rca/incidents/link`

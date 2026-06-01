@@ -1,3 +1,5 @@
+using Andon.Web.Data;
+using Andon.Web.Dtos.ActionItems;
 using Andon.Web.Dtos.Andon;
 using Andon.Web.Dtos.Common;
 using Andon.Web.Dtos.Events;
@@ -5,10 +7,12 @@ using Andon.Web.Dtos.Gantt;
 using Andon.Web.Models.Shared;
 using Andon.Web.Services.Andon;
 using Andon.Web.Services.Events;
+using Microsoft.EntityFrameworkCore;
 
 namespace Andon.Web.Services.Gantt;
 
 public sealed class GanttIntegrationService(
+    AppDbContext context,
     IOperationalEventService operationalEventService,
     IAndonAlertService andonAlertService) : IGanttIntegrationService
 {
@@ -79,6 +83,88 @@ public sealed class GanttIntegrationService(
         }, []);
     }
 
+    public async Task<(GanttTaskStatusResponse? Response, IReadOnlyList<ApiError> Errors)> GetTaskStatusAsync(
+        Guid externalTaskId,
+        GanttTaskStatusRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var errors = Validate(externalTaskId, request);
+        if (errors.Count > 0)
+        {
+            return (null, errors);
+        }
+
+        var tenantId = Normalize(request.TenantId);
+        var fromUtc = NormalizeUtc(request.FromUtc);
+        var toUtc = NormalizeUtc(request.ToUtc);
+        var limit = request.Limit ?? 100;
+
+        var eventsQuery = context.OperationalEvents
+            .AsNoTracking()
+            .Where(item =>
+                item.TenantId == tenantId &&
+                item.ExternalTaskId == externalTaskId);
+
+        var alertsQuery = context.AndonAlerts
+            .AsNoTracking()
+            .Where(item =>
+                item.TenantId == tenantId &&
+                item.ExternalTaskId == externalTaskId);
+
+        var actionItemsQuery = context.ActionItems
+            .AsNoTracking()
+            .Where(item =>
+                item.TenantId == tenantId &&
+                item.ExternalTaskId == externalTaskId);
+
+        if (request.ExternalProjectId.HasValue)
+        {
+            eventsQuery = eventsQuery.Where(item => item.ExternalProjectId == request.ExternalProjectId.Value);
+            alertsQuery = alertsQuery.Where(item => item.ExternalProjectId == request.ExternalProjectId.Value);
+            actionItemsQuery = actionItemsQuery.Where(item => item.ExternalProjectId == request.ExternalProjectId.Value);
+        }
+
+        if (fromUtc.HasValue)
+        {
+            eventsQuery = eventsQuery.Where(item => item.OccurredUtc >= fromUtc.Value);
+        }
+
+        if (toUtc.HasValue)
+        {
+            eventsQuery = eventsQuery.Where(item => item.OccurredUtc <= toUtc.Value);
+        }
+
+        var events = await eventsQuery
+            .OrderByDescending(item => item.OccurredUtc)
+            .ThenByDescending(item => item.Id)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+
+        var alerts = await alertsQuery
+            .OrderBy(item => item.Status == AndonAlertStatus.Resolved || item.Status == AndonAlertStatus.Cancelled)
+            .ThenByDescending(item => item.Severity)
+            .ThenBy(item => item.OpenedUtc)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+
+        var actionItems = await actionItemsQuery
+            .OrderBy(item => item.Status == ActionItemStatus.Completed || item.Status == ActionItemStatus.Cancelled)
+            .ThenBy(item => item.DueDate ?? DateOnly.MaxValue)
+            .ThenByDescending(item => item.Priority)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+
+        return (new GanttTaskStatusResponse
+        {
+            TenantId = tenantId,
+            ExternalProjectId = request.ExternalProjectId,
+            ExternalTaskId = externalTaskId,
+            Events = events.Select(OperationalEventResponse.FromEntity).ToList(),
+            Alerts = alerts.Select(AndonAlertResponse.FromEntity).ToList(),
+            ActionItems = actionItems.Select(ActionItemResponse.FromEntity).ToList()
+        }, []);
+    }
+
     private static List<ApiError> Validate(CreateGanttTaskEventRequest request)
     {
         var errors = new List<ApiError>();
@@ -115,6 +201,34 @@ public sealed class GanttIntegrationService(
         return errors;
     }
 
+    private static List<ApiError> Validate(Guid externalTaskId, GanttTaskStatusRequest request)
+    {
+        var errors = new List<ApiError>();
+
+        AddRequired(errors, request.TenantId, "tenantId", "TenantId is required.");
+
+        if (externalTaskId == Guid.Empty)
+        {
+            errors.Add(ApiError.Create("ExternalTaskId is required.", "required", "externalTaskId"));
+        }
+
+        var fromUtc = NormalizeUtc(request.FromUtc);
+        var toUtc = NormalizeUtc(request.ToUtc);
+        if (fromUtc.HasValue && toUtc.HasValue && fromUtc.Value > toUtc.Value)
+        {
+            errors.Add(ApiError.Create("FromUtc must be earlier than ToUtc.", "invalid_date_range", "fromUtc"));
+        }
+
+        if (request.Limit is < 1 or > 500)
+        {
+            errors.Add(ApiError.Create("Limit must be between 1 and 500.", "invalid_limit", "limit"));
+        }
+
+        AddMaxLength(errors, request.TenantId, 64, "tenantId");
+
+        return errors;
+    }
+
     private static void AddRequired(List<ApiError> errors, string value, string field, string message)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -133,4 +247,19 @@ public sealed class GanttIntegrationService(
 
     private static string Normalize(string? value, string fallback = "")
         => string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+
+    private static DateTime? NormalizeUtc(DateTime? value)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        return value.Value.Kind switch
+        {
+            DateTimeKind.Utc => value.Value,
+            DateTimeKind.Local => value.Value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)
+        };
+    }
 }
