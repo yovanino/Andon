@@ -9,6 +9,32 @@ namespace Andon.Web.Controllers.Api;
 [Route("api/v1/events")]
 public sealed class OperationalEventsController(IOperationalEventService operationalEventService) : ControllerBase
 {
+    [HttpGet("live")]
+    public async Task<IActionResult> Live(
+        [FromQuery] LiveOperationalEventsRequest request,
+        CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.TraceIdentifier;
+        var (events, errors) = await operationalEventService.GetLiveAsync(request, cancellationToken);
+
+        if (errors.Count > 0)
+        {
+            return BadRequest(ApiResult<IReadOnlyList<OperationalEventResponse>>.Fail(
+                errors,
+                "Live operational events were not retrieved.",
+                correlationId));
+        }
+
+        var response = events
+            .Select(OperationalEventResponse.FromEntity)
+            .ToList();
+
+        return Ok(ApiResult<IReadOnlyList<OperationalEventResponse>>.Ok(
+            response,
+            "Live operational events retrieved.",
+            correlationId));
+    }
+
     [HttpPost]
     public async Task<IActionResult> Create(
         [FromBody] CreateOperationalEventRequest request,
