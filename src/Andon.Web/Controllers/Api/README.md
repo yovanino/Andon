@@ -18,6 +18,7 @@ Implemented endpoints:
 - `POST /api/v1/andon/alerts/{id}/transition`
 - `GET /api/v1/andon/alerts/{id}/comments`
 - `POST /api/v1/andon/alerts/{id}/comments`
+- `GET /api/v1/andon/alerts/{id}/history`
 - `GET /api/v1/action-items`
 - `POST /api/v1/action-items`
 - `POST /api/v1/action-items/{id}/status`

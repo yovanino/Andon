@@ -79,6 +79,7 @@ public sealed class AndonAlertService(AppDbContext context) : IAndonAlertService
         };
 
         context.AndonAlerts.Add(alert);
+        AddHistory(alert, AndonTransitionAction.Create, null, alert.Status, "Alert created.", request.CreatedByPrincipalType, request.CreatedByPrincipalId, now);
         await context.SaveChangesAsync(cancellationToken);
 
         return (alert, []);
@@ -184,6 +185,7 @@ public sealed class AndonAlertService(AppDbContext context) : IAndonAlertService
         }
 
         var now = DateTime.UtcNow;
+        var fromStatus = alert.Status;
         var transitionErrors = ApplyTransition(alert, request, now);
         if (transitionErrors.Count > 0)
         {
@@ -191,6 +193,7 @@ public sealed class AndonAlertService(AppDbContext context) : IAndonAlertService
         }
 
         alert.UpdatedUtc = now;
+        AddHistory(alert, request.Action, fromStatus, alert.Status, request.Comment, request.ActorPrincipalType, request.ActorPrincipalId, now);
         await context.SaveChangesAsync(cancellationToken);
 
         return (alert, []);
@@ -232,6 +235,7 @@ public sealed class AndonAlertService(AppDbContext context) : IAndonAlertService
 
         alert.UpdatedUtc = now;
         context.AndonComments.Add(comment);
+        AddHistory(alert, AndonTransitionAction.Comment, alert.Status, alert.Status, request.Comment, request.CreatedByPrincipalType, request.CreatedByPrincipalId, now);
         await context.SaveChangesAsync(cancellationToken);
 
         return (comment, []);
@@ -272,6 +276,43 @@ public sealed class AndonAlertService(AppDbContext context) : IAndonAlertService
             .ToListAsync(cancellationToken);
 
         return (comments, []);
+    }
+
+    public async Task<(IReadOnlyList<AndonAlertHistory> History, IReadOnlyList<ApiError> Errors)> GetHistoryAsync(
+        long alertId,
+        ListAndonHistoryRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var errors = Validate(alertId, request);
+        if (errors.Count > 0)
+        {
+            return ([], errors);
+        }
+
+        var alertExists = await context.AndonAlerts
+            .AsNoTracking()
+            .AnyAsync(item =>
+                item.Id == alertId &&
+                item.TenantId == Normalize(request.TenantId),
+                cancellationToken);
+
+        if (!alertExists)
+        {
+            return ([], [ApiError.Create("Andon alert was not found for this tenant.", "alert_not_found", "alertId")]);
+        }
+
+        var limit = request.Limit ?? 100;
+        var history = await context.AndonAlertHistory
+            .AsNoTracking()
+            .Where(item =>
+                item.AndonAlertId == alertId &&
+                item.TenantId == Normalize(request.TenantId))
+            .OrderBy(item => item.CreatedUtc)
+            .ThenBy(item => item.Id)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+
+        return (history, []);
     }
 
     private static List<ApiError> Validate(CreateAndonAlertRequest request)
@@ -329,6 +370,27 @@ public sealed class AndonAlertService(AppDbContext context) : IAndonAlertService
     }
 
     private static List<ApiError> Validate(long alertId, ListAndonCommentsRequest request)
+    {
+        var errors = new List<ApiError>();
+
+        if (alertId <= 0)
+        {
+            errors.Add(ApiError.Create("AlertId must be greater than zero.", "invalid_alert_id", "alertId"));
+        }
+
+        AddRequired(errors, request.TenantId, "tenantId", "TenantId is required.");
+
+        if (request.Limit is < 1 or > 500)
+        {
+            errors.Add(ApiError.Create("Limit must be between 1 and 500.", "invalid_limit", "limit"));
+        }
+
+        AddMaxLength(errors, request.TenantId, 64, "tenantId");
+
+        return errors;
+    }
+
+    private static List<ApiError> Validate(long alertId, ListAndonHistoryRequest request)
     {
         var errors = new List<ApiError>();
 
@@ -504,6 +566,29 @@ public sealed class AndonAlertService(AppDbContext context) : IAndonAlertService
         alert.ResponsiblePrincipalType = Normalize(request.ResponsiblePrincipalType, alert.ResponsiblePrincipalType);
         alert.ResponsiblePrincipalId = Normalize(request.ResponsiblePrincipalId, alert.ResponsiblePrincipalId);
         alert.ResponsibleDisplayName = Normalize(request.ResponsibleDisplayName, alert.ResponsibleDisplayName);
+    }
+
+    private static void AddHistory(
+        AndonAlert alert,
+        AndonTransitionAction action,
+        AndonAlertStatus? fromStatus,
+        AndonAlertStatus? toStatus,
+        string comment,
+        string actorPrincipalType,
+        string actorPrincipalId,
+        DateTime createdUtc)
+    {
+        alert.History.Add(new AndonAlertHistory
+        {
+            TenantId = alert.TenantId,
+            Action = action,
+            FromStatus = fromStatus,
+            ToStatus = toStatus,
+            Comment = Normalize(comment),
+            ActorPrincipalType = Normalize(actorPrincipalType, fallback: "system"),
+            ActorPrincipalId = Normalize(actorPrincipalId),
+            CreatedUtc = createdUtc
+        });
     }
 
     private static void AddRequired(List<ApiError> errors, string value, string field, string message)

@@ -90,4 +90,6 @@ public class AndonAlert
     public ICollection<AndonComment> Comments { get; set; } = [];
 
     public ICollection<ActionItem> ActionItems { get; set; } = [];
+
+    public ICollection<AndonAlertHistory> History { get; set; } = [];
 }

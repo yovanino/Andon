@@ -28,4 +28,9 @@ public interface IAndonAlertService
         long alertId,
         ListAndonCommentsRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<(IReadOnlyList<AndonAlertHistory> History, IReadOnlyList<ApiError> Errors)> GetHistoryAsync(
+        long alertId,
+        ListAndonHistoryRequest request,
+        CancellationToken cancellationToken = default);
 }

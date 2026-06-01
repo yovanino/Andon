@@ -131,4 +131,31 @@ public sealed class AndonAlertsController(IAndonAlertService andonAlertService) 
             $"/api/v1/andon/alerts/{id}/comments/{response.Id}",
             ApiResult<AndonCommentResponse>.Ok(response, "Andon alert comment created.", correlationId));
     }
+
+    [HttpGet("{id:long}/history")]
+    public async Task<IActionResult> History(
+        long id,
+        [FromQuery] ListAndonHistoryRequest request,
+        CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.TraceIdentifier;
+        var (history, errors) = await andonAlertService.GetHistoryAsync(id, request, cancellationToken);
+
+        if (errors.Count > 0)
+        {
+            return BadRequest(ApiResult<IReadOnlyList<AndonAlertHistoryResponse>>.Fail(
+                errors,
+                "Andon alert history was not retrieved.",
+                correlationId));
+        }
+
+        var response = history
+            .Select(AndonAlertHistoryResponse.FromEntity)
+            .ToList();
+
+        return Ok(ApiResult<IReadOnlyList<AndonAlertHistoryResponse>>.Ok(
+            response,
+            "Andon alert history retrieved.",
+            correlationId));
+    }
 }

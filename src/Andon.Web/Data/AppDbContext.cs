@@ -11,6 +11,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
     public DbSet<AndonComment> AndonComments => Set<AndonComment>();
 
+    public DbSet<AndonAlertHistory> AndonAlertHistory => Set<AndonAlertHistory>();
+
     public DbSet<ActionItem> ActionItems => Set<ActionItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -114,6 +116,29 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasIndex(item => new { item.TenantId, item.AndonAlertId, item.CreatedUtc });
+        });
+
+        modelBuilder.Entity<AndonAlertHistory>(entity =>
+        {
+            entity.ToTable("andon_alert_history");
+
+            entity.HasKey(item => item.Id);
+            entity.Property(item => item.TenantId).HasMaxLength(64).IsRequired();
+            entity.Property(item => item.Action).HasConversion<string>().HasMaxLength(40).IsRequired();
+            entity.Property(item => item.FromStatus).HasConversion<string>().HasMaxLength(32);
+            entity.Property(item => item.ToStatus).HasConversion<string>().HasMaxLength(32);
+            entity.Property(item => item.Comment).HasMaxLength(2000);
+            entity.Property(item => item.ActorPrincipalType).HasMaxLength(24).IsRequired();
+            entity.Property(item => item.ActorPrincipalId).HasMaxLength(80);
+            entity.Property(item => item.CreatedUtc).HasColumnType("datetime(6)");
+
+            entity.HasOne(item => item.AndonAlert)
+                .WithMany(item => item.History)
+                .HasForeignKey(item => item.AndonAlertId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(item => new { item.TenantId, item.AndonAlertId, item.CreatedUtc });
+            entity.HasIndex(item => new { item.TenantId, item.Action, item.CreatedUtc });
         });
 
         modelBuilder.Entity<ActionItem>(entity =>
