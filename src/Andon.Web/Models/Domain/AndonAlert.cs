@@ -45,6 +45,14 @@ public class AndonAlert
 
     public string ContextSnapshotJson { get; set; } = "{}";
 
+    [MaxLength(80)]
+    public string ExternalRcaIncidentId { get; set; } = string.Empty;
+
+    [MaxLength(40)]
+    public string RcaStatus { get; set; } = string.Empty;
+
+    public DateTime? RcaCreatedUtc { get; set; }
+
     [MaxLength(24)]
     public string ResponsiblePrincipalType { get; set; } = string.Empty;
 

@@ -16,3 +16,9 @@ Gantt integration fields are kept as external references and snapshots, not dire
 - `SourceSystem`
 - `TaskSnapshotJson`
 - `ContextSnapshotJson`
+
+RCA integration fields are also external references:
+
+- `ExternalRcaIncidentId`
+- `RcaStatus`
+- `RcaCreatedUtc`

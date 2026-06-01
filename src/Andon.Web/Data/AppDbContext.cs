@@ -66,6 +66,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(item => item.SourceSystem).HasMaxLength(40);
             entity.Property(item => item.TaskSnapshotJson).HasColumnType("longtext").IsRequired();
             entity.Property(item => item.ContextSnapshotJson).HasColumnType("longtext").IsRequired();
+            entity.Property(item => item.ExternalRcaIncidentId).HasMaxLength(80);
+            entity.Property(item => item.RcaStatus).HasMaxLength(40);
+            entity.Property(item => item.RcaCreatedUtc).HasColumnType("datetime(6)");
             entity.Property(item => item.ResponsiblePrincipalType).HasMaxLength(24);
             entity.Property(item => item.ResponsiblePrincipalId).HasMaxLength(80);
             entity.Property(item => item.ResponsibleDisplayName).HasMaxLength(160);
@@ -88,6 +91,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasIndex(item => new { item.TenantId, item.Status, item.OpenedUtc });
             entity.HasIndex(item => new { item.TenantId, item.Severity, item.Status });
             entity.HasIndex(item => new { item.TenantId, item.ExternalTaskId, item.Status });
+            entity.HasIndex(item => new { item.TenantId, item.ExternalRcaIncidentId });
             entity.HasIndex(item => new { item.TenantId, item.MachineId, item.Status });
             entity.HasIndex(item => item.OperationalEventId);
         });
