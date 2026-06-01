@@ -8,3 +8,7 @@ Planned groups:
 - Andon API: alert lifecycle actions.
 - Gantt integration API: operational status by external Gantt task public id.
 - RCA integration API: create or link RCA incidents.
+
+Implemented endpoints:
+
+- `POST /api/v1/events`
