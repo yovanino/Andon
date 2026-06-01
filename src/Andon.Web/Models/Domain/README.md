@@ -6,3 +6,4 @@ Current entities:
 
 - `OperationalEvent`: base auditable record for events received from Gantt, operators, SCADA, PLC, RCA, or external integrations.
 - `AndonAlert`: operational alert created from an event, task, operator action, or future plant signal.
+- `AndonComment`: timestamped comment stream attached to an alert for shift, supervisor, and maintenance traceability.

@@ -74,4 +74,6 @@ public class AndonAlert
     public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
 
     public OperationalEvent? OperationalEvent { get; set; }
+
+    public ICollection<AndonComment> Comments { get; set; } = [];
 }
