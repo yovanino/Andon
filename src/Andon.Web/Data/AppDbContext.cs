@@ -11,6 +11,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
     public DbSet<AndonComment> AndonComments => Set<AndonComment>();
 
+    public DbSet<ActionItem> ActionItems => Set<ActionItem>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -106,6 +108,39 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasIndex(item => new { item.TenantId, item.AndonAlertId, item.CreatedUtc });
+        });
+
+        modelBuilder.Entity<ActionItem>(entity =>
+        {
+            entity.ToTable("action_items");
+
+            entity.HasKey(item => item.Id);
+            entity.Property(item => item.TenantId).HasMaxLength(64).IsRequired();
+            entity.Property(item => item.ExternalRcaIncidentId).HasMaxLength(80);
+            entity.Property(item => item.Title).HasMaxLength(200).IsRequired();
+            entity.Property(item => item.Description).HasMaxLength(2000);
+            entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
+            entity.Property(item => item.Priority).HasConversion<string>().HasMaxLength(24).IsRequired();
+            entity.Property(item => item.AssignedPrincipalType).HasMaxLength(24);
+            entity.Property(item => item.AssignedPrincipalId).HasMaxLength(80);
+            entity.Property(item => item.AssignedDisplayName).HasMaxLength(160);
+            entity.Property(item => item.ClosureComment).HasMaxLength(2000);
+            entity.Property(item => item.CreatedByPrincipalType).HasMaxLength(24).IsRequired();
+            entity.Property(item => item.CreatedByPrincipalId).HasMaxLength(80);
+            entity.Property(item => item.CreatedUtc).HasColumnType("datetime(6)");
+            entity.Property(item => item.UpdatedUtc).HasColumnType("datetime(6)");
+            entity.Property(item => item.ClosedUtc).HasColumnType("datetime(6)");
+
+            entity.HasOne(item => item.RelatedAndonAlert)
+                .WithMany(item => item.ActionItems)
+                .HasForeignKey(item => item.RelatedAndonAlertId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(item => new { item.TenantId, item.Status, item.DueDate });
+            entity.HasIndex(item => new { item.TenantId, item.ExternalTaskId, item.Status });
+            entity.HasIndex(item => new { item.TenantId, item.ExternalRcaIncidentId });
+            entity.HasIndex(item => new { item.TenantId, item.RelatedAndonAlertId });
+            entity.HasIndex(item => new { item.TenantId, item.AssignedPrincipalType, item.AssignedPrincipalId, item.Status });
         });
     }
 }

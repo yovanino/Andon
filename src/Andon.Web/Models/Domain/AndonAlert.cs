@@ -76,4 +76,6 @@ public class AndonAlert
     public OperationalEvent? OperationalEvent { get; set; }
 
     public ICollection<AndonComment> Comments { get; set; } = [];
+
+    public ICollection<ActionItem> ActionItems { get; set; } = [];
 }

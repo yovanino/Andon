@@ -9,3 +9,4 @@ Current enum contracts:
 - `OperationalEventType`: normalized operational event classification.
 - `AndonAlertStatus`: alert lifecycle state.
 - `AndonTransitionAction`: auditable action names for alert lifecycle changes.
+- `ActionItemStatus`: execution state for corrective and follow-up actions.
