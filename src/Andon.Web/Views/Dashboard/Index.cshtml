@@ -1,0 +1,158 @@
+@model Andon.Web.Models.ViewModels.DashboardViewModel
+@using Andon.Web.Models.Shared
+
+@{
+    ViewData["Title"] = "Andon";
+}
+
+<section class="dashboard-shell">
+    <div class="dashboard-topbar">
+        <div>
+            <p class="dashboard-kicker">Operacion</p>
+            <h1>Andon</h1>
+        </div>
+        <form method="get" class="tenant-form">
+            <label for="tenantId">Tenant</label>
+            <div class="tenant-form-row">
+                <input id="tenantId" name="tenantId" value="@Model.TenantId" />
+                <button type="submit">Actualizar</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="metric-grid">
+        <article class="metric-card metric-card-alert">
+            <span>Alertas abiertas</span>
+            <strong>@Model.OpenAlerts</strong>
+        </article>
+        <article class="metric-card metric-card-critical">
+            <span>Criticas</span>
+            <strong>@Model.CriticalAlerts</strong>
+        </article>
+        <article class="metric-card metric-card-action">
+            <span>Acciones abiertas</span>
+            <strong>@Model.OpenActionItems</strong>
+        </article>
+        <article class="metric-card metric-card-rca">
+            <span>RCA pendiente</span>
+            <strong>@Model.RcaPending</strong>
+        </article>
+    </div>
+
+    <div class="dashboard-grid">
+        <section class="dashboard-panel panel-wide">
+            <div class="panel-heading">
+                <h2>Alertas live</h2>
+                <span>@Model.Alerts.Count</span>
+            </div>
+            <div class="table-wrap">
+                <table class="ops-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Sev</th>
+                            <th>Estado</th>
+                            <th>Titulo</th>
+                            <th>Linea</th>
+                            <th>Maquina</th>
+                            <th>Responsable</th>
+                            <th>RCA</th>
+                            <th>Apertura</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model.Alerts)
+                        {
+                            <tr>
+                                <td>#@item.Id</td>
+                                <td><span class="status-pill @SeverityClass(item.Severity)">@item.Severity</span></td>
+                                <td>@item.Status</td>
+                                <td class="strong-cell">@item.Title</td>
+                                <td>@Fallback(item.LineCode)</td>
+                                <td>@Fallback(item.MachineId)</td>
+                                <td>@Fallback(item.ResponsibleDisplayName)</td>
+                                <td>@Fallback(item.RcaStatus)</td>
+                                <td>@item.OpenedUtc.ToLocalTime().ToString("dd/MM HH:mm")</td>
+                            </tr>
+                        }
+                        @if (Model.Alerts.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="9" class="empty-cell">Sin alertas abiertas</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="dashboard-panel">
+            <div class="panel-heading">
+                <h2>Eventos recientes</h2>
+                <span>@Model.Events.Count</span>
+            </div>
+            <div class="stack-list">
+                @foreach (var item in Model.Events)
+                {
+                    <article class="stack-item">
+                        <div>
+                            <span class="status-pill @SeverityClass(item.Severity)">@item.Severity</span>
+                            <strong>@item.Title</strong>
+                        </div>
+                        <p>@item.Source / @item.EventType</p>
+                        <footer>
+                            <span>@Fallback(item.MachineId)</span>
+                            <time>@item.OccurredUtc.ToLocalTime().ToString("dd/MM HH:mm")</time>
+                        </footer>
+                    </article>
+                }
+                @if (Model.Events.Count == 0)
+                {
+                    <p class="empty-copy">Sin eventos registrados</p>
+                }
+            </div>
+        </section>
+
+        <section class="dashboard-panel">
+            <div class="panel-heading">
+                <h2>Acciones</h2>
+                <span>@Model.ActionItems.Count</span>
+            </div>
+            <div class="stack-list">
+                @foreach (var item in Model.ActionItems)
+                {
+                    <article class="stack-item">
+                        <div>
+                            <span class="status-pill @SeverityClass(item.Priority)">@item.Priority</span>
+                            <strong>@item.Title</strong>
+                        </div>
+                        <p>@item.Status / @Fallback(item.AssignedDisplayName)</p>
+                        <footer>
+                            <span>#@item.Id</span>
+                            <time>@(item.DueDate?.ToString("dd/MM/yyyy") ?? "Sin fecha")</time>
+                        </footer>
+                    </article>
+                }
+                @if (Model.ActionItems.Count == 0)
+                {
+                    <p class="empty-copy">Sin acciones abiertas</p>
+                }
+            </div>
+        </section>
+    </div>
+</section>
+
+@functions {
+    private static string Fallback(string value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static string SeverityClass(OperationalSeverity severity)
+    {
+        return severity switch
+        {
+            OperationalSeverity.Critical => "pill-critical",
+            OperationalSeverity.High => "pill-high",
+            OperationalSeverity.Medium => "pill-medium",
+            _ => "pill-low"
+        };
+    }
+}
